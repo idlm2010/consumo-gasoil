@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consumo Gasoil - Calefacción</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🔥 Consumo Gasoil</h1>
+      <p class="subtitle">Control de calefacción</p>
+    </header>
+
+    <!-- Resumen -->
+    <section class="stats" id="stats">
+      <div class="stat-card">
+        <span class="stat-value" id="total-litros">—</span>
+        <span class="stat-label">Litros totales</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="total-gasto">—</span>
+        <span class="stat-label">Gasto total</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="num-cargas">—</span>
+        <span class="stat-label">Cargas</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="precio-medio">—</span>
+        <span class="stat-label">Precio medio €/L</span>
+      </div>
+    </section>
+
+    <!-- Pestañas -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="cargas">Cargas</button>
+      <button class="tab" data-tab="bitacora">Bitácora</button>
+    </nav>
+
+    <!-- Sección Cargas -->
+    <section id="tab-cargas" class="tab-content active">
+      <div class="card">
+        <h2>Nueva carga</h2>
+        <form id="form-carga">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="carga-fecha">Fecha</label>
+              <input type="date" id="carga-fecha" required>
+            </div>
+            <div class="form-group">
+              <label for="carga-litros">Litros</label>
+              <input type="number" id="carga-litros" step="0.01" min="0" required>
+            </div>
+            <div class="form-group">
+              <label for="carga-precio">Precio €/L</label>
+              <input type="number" id="carga-precio" step="0.0001" min="0" required>
+            </div>
+            <div class="form-group">
+              <label for="carga-importe">Importe €</label>
+              <input type="number" id="carga-importe" step="0.01" readonly>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Añadir carga</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Histórico de cargas</h2>
+          <span class="badge" id="cargas-count">0</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Litros</th>
+                <th>Precio €/L</th>
+                <th>Importe €</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-cargas"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sección Bitácora -->
+    <section id="tab-bitacora" class="tab-content">
+      <div class="card">
+        <h2>Nueva entrada</h2>
+        <form id="form-bitacora">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="bit-fecha">Fecha</label>
+              <input type="date" id="bit-fecha" required>
+            </div>
+            <div class="form-group">
+              <label for="bit-tipo">Tipo</label>
+              <select id="bit-tipo" required>
+                <option value="Encendido">Encendido</option>
+                <option value="Apagado">Apagado</option>
+                <option value="Mejora de instalación">Mejora de instalación</option>
+                <option value="Informativo">Informativo</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="bit-cm">Cm</label>
+              <input type="number" id="bit-cm" step="1" min="0">
+            </div>
+            <div class="form-group">
+              <label for="bit-litros">Litros depósito</label>
+              <input type="number" id="bit-litros" step="1" min="0">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="bit-desc">Descripción</label>
+            <input type="text" id="bit-desc" placeholder="Opcional">
+          </div>
+          <button type="submit" class="btn btn-primary">Añadir entrada</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Histórico de bitácora</h2>
+          <span class="badge" id="bitacora-count">0</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Cm</th>
+                <th>Litros dep.</th>
+                <th>Descripción</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-bitacora"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>Datos almacenados en Firebase · Alojado en GitHub Pages</p>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
