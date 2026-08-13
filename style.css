@@ -286,3 +286,61 @@ footer {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Extra stats */
+.extra-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.stat-card.highlight {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, #1a2332, #1e3a5f);
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--border);
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+}
+
+.btn-icon:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.btn-icon.danger:hover {
+  color: var(--danger);
+}
+
+.delta-up { color: var(--danger); }
+.delta-down { color: var(--success); }
+.delta-same { color: var(--text-muted); }
