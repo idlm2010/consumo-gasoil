@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getDatabase, ref, onValue, push, set } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+import { getDatabase, ref, onValue, push, set, remove, update } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBVcWuR5ePnYhR_nVhxCIKNXbIss2Aa63U",
@@ -14,8 +14,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Datos en memoria
 let todasLasCargas = [];
+let todaLaBitacora = [];
 let chartLitros = null;
 let chartGasto = null;
 let chartPrecio = null;
@@ -30,12 +30,12 @@ document.querySelectorAll(".tab").forEach(btn => {
   });
 });
 
-// ===== Fecha de hoy =====
+// ===== Fecha hoy =====
 const hoy = new Date().toISOString().slice(0, 10);
 document.getElementById("carga-fecha").value = hoy;
 document.getElementById("bit-fecha").value = hoy;
 
-// ===== Cálculo automático importe =====
+// ===== Cálculo importe =====
 const inputLitros = document.getElementById("carga-litros");
 const inputPrecio = document.getElementById("carga-precio");
 const inputImporte = document.getElementById("carga-importe");
@@ -60,17 +60,26 @@ onValue(ref(db, "cargas"), (snapshot) => {
   actualizarStats();
   actualizarGraficos();
   actualizarTablaAnual();
+  actualizarComparativa();
+  calcularTemporadas();
 });
 
 // ===== Cargar Bitácora =====
 onValue(ref(db, "bitacora"), (snapshot) => {
   const data = snapshot.val() || {};
-  const lista = Object.entries(data)
+  todaLaBitacora = Object.entries(data)
     .map(([id, b]) => ({ id, ...b }))
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
 
+  renderBitacora();
+  actualizarNivelDeposito();
+  calcularTemporadas();
+});
+
+// ===== Render Bitácora =====
+function renderBitacora() {
   const tbody = document.getElementById("tabla-bitacora");
-  tbody.innerHTML = lista.map(b => {
+  tbody.innerHTML = todaLaBitacora.map(b => {
     const tipoClass = {
       "Encendido": "tipo-encendido",
       "Apagado": "tipo-apagado",
@@ -85,27 +94,27 @@ onValue(ref(db, "bitacora"), (snapshot) => {
         <td>${b.cm ?? "—"}</td>
         <td>${b.litrosDeposito ?? "—"}</td>
         <td>${b.descripcion || "—"}</td>
+        <td>
+          <button class="btn-icon" onclick="editarBitacora('${b.id}')">✏️</button>
+          <button class="btn-icon danger" onclick="borrarBitacora('${b.id}')">🗑️</button>
+        </td>
       </tr>
     `;
   }).join("");
 
-  document.getElementById("bitacora-count").textContent = lista.length;
-});
+  document.getElementById("bitacora-count").textContent = todaLaBitacora.length;
+}
 
-// ===== Filtro por año =====
+// ===== Filtro año =====
 document.getElementById("filtro-ano-cargas").addEventListener("change", renderCargas);
 
 function actualizarFiltroAnos() {
   const select = document.getElementById("filtro-ano-cargas");
   const anos = [...new Set(todasLasCargas.map(c => c.fecha.slice(0, 4)))].sort((a, b) => b - a);
   const valorActual = select.value;
-
   select.innerHTML = `<option value="todos">Todos los años</option>` +
     anos.map(a => `<option value="${a}">${a}</option>`).join("");
-
-  if ([...select.options].some(o => o.value === valorActual)) {
-    select.value = valorActual;
-  }
+  if ([...select.options].some(o => o.value === valorActual)) select.value = valorActual;
 }
 
 function renderCargas() {
@@ -120,13 +129,17 @@ function renderCargas() {
       <td>${c.litros}</td>
       <td>${Number(c.precioLitro).toFixed(4)}</td>
       <td>${Number(c.importe).toFixed(2)}</td>
+      <td>
+        <button class="btn-icon" onclick="editarCarga('${c.id}')">✏️</button>
+        <button class="btn-icon danger" onclick="borrarCarga('${c.id}')">🗑️</button>
+      </td>
     </tr>
   `).join("");
 
   document.getElementById("cargas-count").textContent = lista.length;
 }
 
-// ===== Stats globales =====
+// ===== Stats =====
 function actualizarStats() {
   const totalLitros = todasLasCargas.reduce((s, c) => s + Number(c.litros), 0);
   const totalGasto = todasLasCargas.reduce((s, c) => s + Number(c.importe), 0);
@@ -138,14 +151,139 @@ function actualizarStats() {
   document.getElementById("precio-medio").textContent = precioMedio.toFixed(3);
 }
 
-// ===== Agrupar por año =====
+// ===== Nivel depósito =====
+function actualizarNivelDeposito() {
+  const conNivel = todaLaBitacora
+    .filter(b => b.litrosDeposito != null || b.cm != null)
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+  if (conNivel.length === 0) {
+    document.getElementById("nivel-deposito").textContent = "Sin datos";
+    return;
+  }
+
+  const ultimo = conNivel[0];
+  let texto = "";
+  if (ultimo.litrosDeposito != null) texto += `${ultimo.litrosDeposito} L`;
+  if (ultimo.cm != null) texto += (texto ? " · " : "") + `${ultimo.cm} cm`;
+  texto += ` (${formatearFecha(ultimo.fecha)})`;
+
+  document.getElementById("nivel-deposito").textContent = texto;
+}
+
+// ===== Comparativa año actual vs anterior =====
+function actualizarComparativa() {
+  const anoActual = new Date().getFullYear().toString();
+  const anoAnterior = (parseInt(anoActual) - 1).toString();
+
+  const cargasActual = todasLasCargas.filter(c => c.fecha.startsWith(anoActual));
+  const cargasAnterior = todasLasCargas.filter(c => c.fecha.startsWith(anoAnterior));
+
+  const litrosActual = cargasActual.reduce((s, c) => s + Number(c.litros), 0);
+  const litrosAnterior = cargasAnterior.reduce((s, c) => s + Number(c.litros), 0);
+  const gastoActual = cargasActual.reduce((s, c) => s + Number(c.importe), 0);
+  const gastoAnterior = cargasAnterior.reduce((s, c) => s + Number(c.importe), 0);
+
+  // Litros
+  if (litrosAnterior > 0) {
+    const diff = litrosActual - litrosAnterior;
+    const pct = ((diff / litrosAnterior) * 100).toFixed(1);
+    const clase = diff > 0 ? "delta-up" : diff < 0 ? "delta-down" : "delta-same";
+    document.getElementById("comp-litros").innerHTML = `<span class="${clase}">${diff > 0 ? "+" : ""}${diff.toFixed(0)} L (${pct}%)</span>`;
+  } else {
+    document.getElementById("comp-litros").textContent = litrosActual > 0 ? `${litrosActual.toFixed(0)} L` : "—";
+  }
+  document.getElementById("comp-litros-label").textContent = `${anoActual} vs ${anoAnterior} (litros)`;
+
+  // Gasto
+  if (gastoAnterior > 0) {
+    const diff = gastoActual - gastoAnterior;
+    const pct = ((diff / gastoAnterior) * 100).toFixed(1);
+    const clase = diff > 0 ? "delta-up" : diff < 0 ? "delta-down" : "delta-same";
+    document.getElementById("comp-gasto").innerHTML = `<span class="${clase}">${diff > 0 ? "+" : ""}${diff.toFixed(0)} € (${pct}%)</span>`;
+  } else {
+    document.getElementById("comp-gasto").textContent = gastoActual > 0 ? `${gastoActual.toFixed(0)} €` : "—";
+  }
+  document.getElementById("comp-gasto-label").textContent = `${anoActual} vs ${anoAnterior} (gasto)`;
+}
+
+// ===== Temporadas (Encendido → Apagado) =====
+function calcularTemporadas() {
+  if (todaLaBitacora.length === 0 || todasLasCargas.length === 0) return;
+
+  const eventos = [...todaLaBitacora]
+    .filter(b => b.tipo === "Encendido" || b.tipo === "Apagado")
+    .sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+  const temporadas = [];
+  let inicio = null;
+
+  for (const ev of eventos) {
+    if (ev.tipo === "Encendido") {
+      inicio = ev;
+    } else if (ev.tipo === "Apagado" && inicio) {
+      const dias = diasEntre(inicio.fecha, ev.fecha);
+      const cargasPeriodo = todasLasCargas.filter(c => c.fecha >= inicio.fecha && c.fecha <= ev.fecha);
+      const litros = cargasPeriodo.reduce((s, c) => s + Number(c.litros), 0);
+      const gasto = cargasPeriodo.reduce((s, c) => s + Number(c.importe), 0);
+      const litrosDia = dias > 0 ? (litros / dias) : 0;
+
+      temporadas.push({
+        inicio: inicio.fecha,
+        fin: ev.fecha,
+        dias,
+        litros,
+        litrosDia,
+        gasto
+      });
+      inicio = null;
+    }
+  }
+
+  // Si hay un Encendido sin Apagado (temporada actual)
+  if (inicio) {
+    const dias = diasEntre(inicio.fecha, hoy);
+    const cargasPeriodo = todasLasCargas.filter(c => c.fecha >= inicio.fecha);
+    const litros = cargasPeriodo.reduce((s, c) => s + Number(c.litros), 0);
+    const gasto = cargasPeriodo.reduce((s, c) => s + Number(c.importe), 0);
+    const litrosDia = dias > 0 ? (litros / dias) : 0;
+
+    temporadas.push({
+      inicio: inicio.fecha,
+      fin: "En curso",
+      dias,
+      litros,
+      litrosDia,
+      gasto
+    });
+  }
+
+  temporadas.reverse();
+
+  document.getElementById("tabla-temporadas").innerHTML = temporadas.map(t => `
+    <tr>
+      <td>${formatearFecha(t.inicio)}</td>
+      <td>${t.fin === "En curso" ? "<em>En curso</em>" : formatearFecha(t.fin)}</td>
+      <td>${t.dias}</td>
+      <td>${t.litros.toLocaleString("es-ES", { maximumFractionDigits: 0 })}</td>
+      <td>${t.litrosDia.toFixed(1)}</td>
+      <td>${t.gasto.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="6">No hay temporadas calculables</td></tr>`;
+}
+
+function diasEntre(f1, f2) {
+  const d1 = new Date(f1);
+  const d2 = new Date(f2);
+  return Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)));
+}
+
+// ===== Agrupar por año + tabla =====
 function agruparPorAno() {
   const mapa = {};
   todasLasCargas.forEach(c => {
     const ano = c.fecha.slice(0, 4);
-    if (!mapa[ano]) {
-      mapa[ano] = { litros: 0, gasto: 0, cargas: 0 };
-    }
+    if (!mapa[ano]) mapa[ano] = { litros: 0, gasto: 0, cargas: 0 };
     mapa[ano].litros += Number(c.litros);
     mapa[ano].gasto += Number(c.importe);
     mapa[ano].cargas += 1;
@@ -153,7 +291,6 @@ function agruparPorAno() {
   return mapa;
 }
 
-// ===== Tabla resumen anual =====
 function actualizarTablaAnual() {
   const porAno = agruparPorAno();
   const anos = Object.keys(porAno).sort((a, b) => b - a);
@@ -179,7 +316,6 @@ function actualizarGraficos() {
 
   const porAno = agruparPorAno();
   const anos = Object.keys(porAno).sort();
-
   const litrosData = anos.map(a => porAno[a].litros);
   const gastoData = anos.map(a => Math.round(porAno[a].gasto * 100) / 100);
 
@@ -189,23 +325,13 @@ function actualizarGraficos() {
 
   const textColor = "#8b9bb4";
   const gridColor = "#2d3a4f";
-
   const commonOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false }
-    },
+    plugins: { legend: { display: false } },
     scales: {
-      x: {
-        ticks: { color: textColor, maxRotation: 45 },
-        grid: { color: gridColor }
-      },
-      y: {
-        ticks: { color: textColor },
-        grid: { color: gridColor },
-        beginAtZero: true
-      }
+      x: { ticks: { color: textColor, maxRotation: 45 }, grid: { color: gridColor } },
+      y: { ticks: { color: textColor }, grid: { color: gridColor }, beginAtZero: true }
     }
   };
 
@@ -217,14 +343,7 @@ function actualizarGraficos() {
   if (ctxLitros) {
     chartLitros = new Chart(ctxLitros, {
       type: "bar",
-      data: {
-        labels: anos,
-        datasets: [{
-          data: litrosData,
-          backgroundColor: "#3b82f6",
-          borderRadius: 6
-        }]
-      },
+      data: { labels: anos, datasets: [{ data: litrosData, backgroundColor: "#3b82f6", borderRadius: 6 }] },
       options: commonOptions
     });
   }
@@ -233,14 +352,7 @@ function actualizarGraficos() {
   if (ctxGasto) {
     chartGasto = new Chart(ctxGasto, {
       type: "bar",
-      data: {
-        labels: anos,
-        datasets: [{
-          data: gastoData,
-          backgroundColor: "#22c55e",
-          borderRadius: 6
-        }]
-      },
+      data: { labels: anos, datasets: [{ data: gastoData, backgroundColor: "#22c55e", borderRadius: 6 }] },
       options: commonOptions
     });
   }
@@ -275,52 +387,119 @@ function actualizarGraficos() {
             },
             grid: { color: gridColor }
           },
-          y: {
-            ticks: { color: textColor },
-            grid: { color: gridColor },
-            beginAtZero: false
-          }
+          y: { ticks: { color: textColor }, grid: { color: gridColor }, beginAtZero: false }
         }
       }
     });
   }
 }
 
-// ===== Formularios =====
+// ===== Formulario Cargas (crear / editar) =====
 document.getElementById("form-carga").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const nueva = {
+  const id = document.getElementById("carga-id").value;
+  const datos = {
     fecha: document.getElementById("carga-fecha").value,
     litros: parseFloat(document.getElementById("carga-litros").value),
     precioLitro: parseFloat(document.getElementById("carga-precio").value),
     importe: parseFloat(document.getElementById("carga-importe").value)
   };
-  await set(push(ref(db, "cargas")), nueva);
-  e.target.reset();
-  document.getElementById("carga-fecha").value = hoy;
-  inputImporte.value = "";
+
+  if (id) {
+    await update(ref(db, `cargas/${id}`), datos);
+  } else {
+    await set(push(ref(db, "cargas")), datos);
+  }
+  resetFormCarga();
 });
 
+document.getElementById("btn-carga-cancelar").addEventListener("click", resetFormCarga);
+
+function resetFormCarga() {
+  document.getElementById("form-carga").reset();
+  document.getElementById("carga-id").value = "";
+  document.getElementById("carga-fecha").value = hoy;
+  document.getElementById("btn-carga").textContent = "Añadir carga";
+  document.getElementById("btn-carga-cancelar").style.display = "none";
+  inputImporte.value = "";
+}
+
+window.editarCarga = function(id) {
+  const c = todasLasCargas.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById("carga-id").value = id;
+  document.getElementById("carga-fecha").value = c.fecha;
+  document.getElementById("carga-litros").value = c.litros;
+  document.getElementById("carga-precio").value = c.precioLitro;
+  document.getElementById("carga-importe").value = c.importe;
+  document.getElementById("btn-carga").textContent = "Guardar cambios";
+  document.getElementById("btn-carga-cancelar").style.display = "inline-flex";
+  document.querySelector('[data-tab="cargas"]').click();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+window.borrarCarga = async function(id) {
+  if (!confirm("¿Borrar esta carga?")) return;
+  await remove(ref(db, `cargas/${id}`));
+};
+
+// ===== Formulario Bitácora (crear / editar) =====
 document.getElementById("form-bitacora").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const id = document.getElementById("bit-id").value;
   const cm = document.getElementById("bit-cm").value;
   const litros = document.getElementById("bit-litros").value;
   const desc = document.getElementById("bit-desc").value;
 
-  const nueva = {
+  const datos = {
     fecha: document.getElementById("bit-fecha").value,
     tipo: document.getElementById("bit-tipo").value,
     cm: cm ? parseFloat(cm) : null,
     litrosDeposito: litros ? parseFloat(litros) : null,
     descripcion: desc || null
   };
-  await set(push(ref(db, "bitacora")), nueva);
-  e.target.reset();
-  document.getElementById("bit-fecha").value = hoy;
+
+  if (id) {
+    await update(ref(db, `bitacora/${id}`), datos);
+  } else {
+    await set(push(ref(db, "bitacora")), datos);
+  }
+  resetFormBitacora();
 });
+
+document.getElementById("btn-bit-cancelar").addEventListener("click", resetFormBitacora);
+
+function resetFormBitacora() {
+  document.getElementById("form-bitacora").reset();
+  document.getElementById("bit-id").value = "";
+  document.getElementById("bit-fecha").value = hoy;
+  document.getElementById("btn-bit").textContent = "Añadir entrada";
+  document.getElementById("btn-bit-cancelar").style.display = "none";
+}
+
+window.editarBitacora = function(id) {
+  const b = todaLaBitacora.find(x => x.id === id);
+  if (!b) return;
+  document.getElementById("bit-id").value = id;
+  document.getElementById("bit-fecha").value = b.fecha;
+  document.getElementById("bit-tipo").value = b.tipo;
+  document.getElementById("bit-cm").value = b.cm ?? "";
+  document.getElementById("bit-litros").value = b.litrosDeposito ?? "";
+  document.getElementById("bit-desc").value = b.descripcion ?? "";
+  document.getElementById("btn-bit").textContent = "Guardar cambios";
+  document.getElementById("btn-bit-cancelar").style.display = "inline-flex";
+  document.querySelector('[data-tab="bitacora"]').click();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+window.borrarBitacora = async function(id) {
+  if (!confirm("¿Borrar esta entrada de bitácora?")) return;
+  await remove(ref(db, `bitacora/${id}`));
+};
 
 // ===== Utilidades =====
 function formatearFecha(fecha) {
+  if (!fecha || fecha === "En curso") return fecha;
   const [y, m, d] = fecha.split("-");
   return `${d}/${m}/${y}`;
 }
