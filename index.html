@@ -16,7 +16,7 @@
       <p class="subtitle">Control de calefacción</p>
     </header>
 
-    <!-- Resumen -->
+    <!-- Stats principales -->
     <section class="stats" id="stats">
       <div class="stat-card">
         <span class="stat-value" id="total-litros">—</span>
@@ -36,47 +36,51 @@
       </div>
     </section>
 
+    <!-- Nivel depósito + Comparativa -->
+    <section class="extra-stats">
+      <div class="stat-card highlight">
+        <span class="stat-value" id="nivel-deposito">—</span>
+        <span class="stat-label">Nivel estimado depósito</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="comp-litros">—</span>
+        <span class="stat-label" id="comp-litros-label">vs año anterior (litros)</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="comp-gasto">—</span>
+        <span class="stat-label" id="comp-gasto-label">vs año anterior (gasto)</span>
+      </div>
+    </section>
+
     <!-- Pestañas -->
     <nav class="tabs">
       <button class="tab active" data-tab="resumen">Resumen</button>
+      <button class="tab" data-tab="temporadas">Temporadas</button>
       <button class="tab" data-tab="cargas">Cargas</button>
       <button class="tab" data-tab="bitacora">Bitácora</button>
     </nav>
 
-    <!-- Sección Resumen (gráficos) -->
+    <!-- Resumen -->
     <section id="tab-resumen" class="tab-content active">
       <div class="card">
         <h2>Consumo por año (litros)</h2>
-        <div class="chart-container">
-          <canvas id="chart-litros"></canvas>
-        </div>
+        <div class="chart-container"><canvas id="chart-litros"></canvas></div>
       </div>
-
       <div class="card">
         <h2>Gasto por año (€)</h2>
-        <div class="chart-container">
-          <canvas id="chart-gasto"></canvas>
-        </div>
+        <div class="chart-container"><canvas id="chart-gasto"></canvas></div>
       </div>
-
       <div class="card">
         <h2>Evolución del precio (€/L)</h2>
-        <div class="chart-container">
-          <canvas id="chart-precio"></canvas>
-        </div>
+        <div class="chart-container"><canvas id="chart-precio"></canvas></div>
       </div>
-
       <div class="card">
         <h2>Resumen por año</h2>
         <div class="table-wrapper">
           <table>
             <thead>
               <tr>
-                <th>Año</th>
-                <th>Cargas</th>
-                <th>Litros</th>
-                <th>Gasto €</th>
-                <th>Precio medio</th>
+                <th>Año</th><th>Cargas</th><th>Litros</th><th>Gasto €</th><th>Precio medio</th>
               </tr>
             </thead>
             <tbody id="tabla-anual"></tbody>
@@ -85,11 +89,35 @@
       </div>
     </section>
 
-    <!-- Sección Cargas -->
+    <!-- Temporadas (Encendido → Apagado) -->
+    <section id="tab-temporadas" class="tab-content">
+      <div class="card">
+        <h2>Temporadas de calefacción</h2>
+        <p class="hint">Se calculan automáticamente emparejando Encendido → Apagado</p>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Inicio</th>
+                <th>Fin</th>
+                <th>Días</th>
+                <th>Litros</th>
+                <th>L/día</th>
+                <th>Gasto €</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-temporadas"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cargas -->
     <section id="tab-cargas" class="tab-content">
       <div class="card">
         <h2>Nueva carga</h2>
         <form id="form-carga">
+          <input type="hidden" id="carga-id">
           <div class="form-row">
             <div class="form-group">
               <label for="carga-fecha">Fecha</label>
@@ -108,7 +136,10 @@
               <input type="number" id="carga-importe" step="0.01" readonly>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary">Añadir carga</button>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="btn-carga">Añadir carga</button>
+            <button type="button" class="btn btn-secondary" id="btn-carga-cancelar" style="display:none">Cancelar</button>
+          </div>
         </form>
       </div>
 
@@ -116,9 +147,7 @@
         <div class="card-header">
           <h2>Histórico de cargas</h2>
           <div class="filters">
-            <select id="filtro-ano-cargas">
-              <option value="todos">Todos los años</option>
-            </select>
+            <select id="filtro-ano-cargas"><option value="todos">Todos los años</option></select>
             <span class="badge" id="cargas-count">0</span>
           </div>
         </div>
@@ -126,10 +155,7 @@
           <table>
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Litros</th>
-                <th>Precio €/L</th>
-                <th>Importe €</th>
+                <th>Fecha</th><th>Litros</th><th>Precio €/L</th><th>Importe €</th><th></th>
               </tr>
             </thead>
             <tbody id="tabla-cargas"></tbody>
@@ -138,11 +164,12 @@
       </div>
     </section>
 
-    <!-- Sección Bitácora -->
+    <!-- Bitácora -->
     <section id="tab-bitacora" class="tab-content">
       <div class="card">
         <h2>Nueva entrada</h2>
         <form id="form-bitacora">
+          <input type="hidden" id="bit-id">
           <div class="form-row">
             <div class="form-group">
               <label for="bit-fecha">Fecha</label>
@@ -170,7 +197,10 @@
             <label for="bit-desc">Descripción</label>
             <input type="text" id="bit-desc" placeholder="Opcional">
           </div>
-          <button type="submit" class="btn btn-primary">Añadir entrada</button>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="btn-bit">Añadir entrada</button>
+            <button type="button" class="btn btn-secondary" id="btn-bit-cancelar" style="display:none">Cancelar</button>
+          </div>
         </form>
       </div>
 
@@ -183,11 +213,7 @@
           <table>
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Tipo</th>
-                <th>Cm</th>
-                <th>Litros dep.</th>
-                <th>Descripción</th>
+                <th>Fecha</th><th>Tipo</th><th>Cm</th><th>Litros dep.</th><th>Descripción</th><th></th>
               </tr>
             </thead>
             <tbody id="tabla-bitacora"></tbody>
