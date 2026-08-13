@@ -23,16 +23,16 @@
         <span class="stat-label">Litros totales</span>
       </div>
       <div class="stat-card">
-        <span class="stat-value" id="total-gasto">—</span>
+        <span class="stat-value" id="gasto-combustible">—</span>
+        <span class="stat-label">Gasto combustible</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="gasto-mantenimiento">—</span>
+        <span class="stat-label">Gasto mantenimiento</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="gasto-total">—</span>
         <span class="stat-label">Gasto total</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value" id="num-cargas">—</span>
-        <span class="stat-label">Cargas</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value" id="precio-medio">—</span>
-        <span class="stat-label">Precio medio €/L</span>
       </div>
     </section>
 
@@ -58,6 +58,7 @@
       <button class="tab" data-tab="temporadas">Temporadas</button>
       <button class="tab" data-tab="cargas">Cargas</button>
       <button class="tab" data-tab="bitacora">Bitácora</button>
+      <button class="tab" data-tab="mantenimientos">Mantenimientos</button>
     </nav>
 
     <!-- Resumen -->
@@ -89,7 +90,7 @@
       </div>
     </section>
 
-    <!-- Temporadas (Encendido → Apagado) -->
+    <!-- Temporadas -->
     <section id="tab-temporadas" class="tab-content">
       <div class="card">
         <h2>Temporadas de calefacción</h2>
@@ -217,6 +218,54 @@
               </tr>
             </thead>
             <tbody id="tabla-bitacora"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Mantenimientos -->
+    <section id="tab-mantenimientos" class="tab-content">
+      <div class="card">
+        <h2>Nuevo mantenimiento</h2>
+        <form id="form-mantenimiento">
+          <input type="hidden" id="mant-id">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="mant-fecha">Fecha</label>
+              <input type="date" id="mant-fecha" required>
+            </div>
+            <div class="form-group">
+              <label for="mant-importe">Importe €</label>
+              <input type="number" id="mant-importe" step="0.01" min="0" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="mant-desc">Descripción</label>
+            <textarea id="mant-desc" rows="3" placeholder="Detalle del mantenimiento..." required></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="btn-mant">Añadir mantenimiento</button>
+            <button type="button" class="btn btn-secondary" id="btn-mant-cancelar" style="display:none">Cancelar</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Histórico de mantenimientos</h2>
+          <span class="badge" id="mant-count">0</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Importe €</th>
+                <th>Descripción</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tabla-mantenimientos"></tbody>
           </table>
         </div>
       </div>
