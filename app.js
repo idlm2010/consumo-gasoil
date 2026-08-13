@@ -14,6 +14,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+// Datos en memoria
+let todasLasCargas = [];
+let chartLitros = null;
+let chartGasto = null;
+let chartPrecio = null;
+
 // ===== Tabs =====
 document.querySelectorAll(".tab").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -24,12 +30,12 @@ document.querySelectorAll(".tab").forEach(btn => {
   });
 });
 
-// ===== Fecha de hoy por defecto =====
+// ===== Fecha de hoy =====
 const hoy = new Date().toISOString().slice(0, 10);
 document.getElementById("carga-fecha").value = hoy;
 document.getElementById("bit-fecha").value = hoy;
 
-// ===== Cálculo automático de importe =====
+// ===== Cálculo automático importe =====
 const inputLitros = document.getElementById("carga-litros");
 const inputPrecio = document.getElementById("carga-precio");
 const inputImporte = document.getElementById("carga-importe");
@@ -39,51 +45,32 @@ function calcularImporte() {
   const precio = parseFloat(inputPrecio.value) || 0;
   inputImporte.value = (litros * precio).toFixed(2);
 }
-
 inputLitros.addEventListener("input", calcularImporte);
 inputPrecio.addEventListener("input", calcularImporte);
 
-// ===== Cargar y mostrar Cargas =====
-const tablaCargas = document.getElementById("tabla-cargas");
-
+// ===== Cargar Cargas =====
 onValue(ref(db, "cargas"), (snapshot) => {
   const data = snapshot.val() || {};
-  const lista = Object.entries(data)
+  todasLasCargas = Object.entries(data)
     .map(([id, c]) => ({ id, ...c }))
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
 
-  tablaCargas.innerHTML = lista.map(c => `
-    <tr>
-      <td>${formatearFecha(c.fecha)}</td>
-      <td>${c.litros}</td>
-      <td>${Number(c.precioLitro).toFixed(4)}</td>
-      <td>${Number(c.importe).toFixed(2)}</td>
-    </tr>
-  `).join("");
-
-  document.getElementById("cargas-count").textContent = lista.length;
-
-  // Stats
-  const totalLitros = lista.reduce((s, c) => s + Number(c.litros), 0);
-  const totalGasto = lista.reduce((s, c) => s + Number(c.importe), 0);
-  const precioMedio = totalLitros > 0 ? totalGasto / totalLitros : 0;
-
-  document.getElementById("total-litros").textContent = totalLitros.toLocaleString("es-ES", { maximumFractionDigits: 0 });
-  document.getElementById("total-gasto").textContent = totalGasto.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
-  document.getElementById("num-cargas").textContent = lista.length;
-  document.getElementById("precio-medio").textContent = precioMedio.toFixed(3);
+  actualizarFiltroAnos();
+  renderCargas();
+  actualizarStats();
+  actualizarGraficos();
+  actualizarTablaAnual();
 });
 
-// ===== Cargar y mostrar Bitácora =====
-const tablaBitacora = document.getElementById("tabla-bitacora");
-
+// ===== Cargar Bitácora =====
 onValue(ref(db, "bitacora"), (snapshot) => {
   const data = snapshot.val() || {};
   const lista = Object.entries(data)
     .map(([id, b]) => ({ id, ...b }))
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
 
-  tablaBitacora.innerHTML = lista.map(b => {
+  const tbody = document.getElementById("tabla-bitacora");
+  tbody.innerHTML = lista.map(b => {
     const tipoClass = {
       "Encendido": "tipo-encendido",
       "Apagado": "tipo-apagado",
@@ -105,29 +92,201 @@ onValue(ref(db, "bitacora"), (snapshot) => {
   document.getElementById("bitacora-count").textContent = lista.length;
 });
 
-// ===== Formulario Nueva Carga =====
+// ===== Filtro por año =====
+document.getElementById("filtro-ano-cargas").addEventListener("change", renderCargas);
+
+function actualizarFiltroAnos() {
+  const select = document.getElementById("filtro-ano-cargas");
+  const anos = [...new Set(todasLasCargas.map(c => c.fecha.slice(0, 4)))].sort((a, b) => b - a);
+  const valorActual = select.value;
+
+  select.innerHTML = `<option value="todos">Todos los años</option>` +
+    anos.map(a => `<option value="${a}">${a}</option>`).join("");
+
+  if ([...select.options].some(o => o.value === valorActual)) {
+    select.value = valorActual;
+  }
+}
+
+function renderCargas() {
+  const filtro = document.getElementById("filtro-ano-cargas").value;
+  const lista = filtro === "todos"
+    ? todasLasCargas
+    : todasLasCargas.filter(c => c.fecha.startsWith(filtro));
+
+  document.getElementById("tabla-cargas").innerHTML = lista.map(c => `
+    <tr>
+      <td>${formatearFecha(c.fecha)}</td>
+      <td>${c.litros}</td>
+      <td>${Number(c.precioLitro).toFixed(4)}</td>
+      <td>${Number(c.importe).toFixed(2)}</td>
+    </tr>
+  `).join("");
+
+  document.getElementById("cargas-count").textContent = lista.length;
+}
+
+// ===== Stats globales =====
+function actualizarStats() {
+  const totalLitros = todasLasCargas.reduce((s, c) => s + Number(c.litros), 0);
+  const totalGasto = todasLasCargas.reduce((s, c) => s + Number(c.importe), 0);
+  const precioMedio = totalLitros > 0 ? totalGasto / totalLitros : 0;
+
+  document.getElementById("total-litros").textContent = totalLitros.toLocaleString("es-ES", { maximumFractionDigits: 0 });
+  document.getElementById("total-gasto").textContent = totalGasto.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+  document.getElementById("num-cargas").textContent = todasLasCargas.length;
+  document.getElementById("precio-medio").textContent = precioMedio.toFixed(3);
+}
+
+// ===== Agrupar por año =====
+function agruparPorAno() {
+  const mapa = {};
+  todasLasCargas.forEach(c => {
+    const ano = c.fecha.slice(0, 4);
+    if (!mapa[ano]) {
+      mapa[ano] = { litros: 0, gasto: 0, cargas: 0 };
+    }
+    mapa[ano].litros += Number(c.litros);
+    mapa[ano].gasto += Number(c.importe);
+    mapa[ano].cargas += 1;
+  });
+  return mapa;
+}
+
+// ===== Tabla resumen anual =====
+function actualizarTablaAnual() {
+  const porAno = agruparPorAno();
+  const anos = Object.keys(porAno).sort((a, b) => b - a);
+
+  document.getElementById("tabla-anual").innerHTML = anos.map(ano => {
+    const d = porAno[ano];
+    const medio = d.litros > 0 ? (d.gasto / d.litros).toFixed(3) : "—";
+    return `
+      <tr>
+        <td><strong>${ano}</strong></td>
+        <td>${d.cargas}</td>
+        <td>${d.litros.toLocaleString("es-ES", { maximumFractionDigits: 0 })}</td>
+        <td>${d.gasto.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}</td>
+        <td>${medio}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+// ===== Gráficos =====
+function actualizarGraficos() {
+  const porAno = agruparPorAno();
+  const anos = Object.keys(porAno).sort();
+
+  const litrosData = anos.map(a => porAno[a].litros);
+  const gastoData = anos.map(a => Math.round(porAno[a].gasto));
+
+  // Datos de precio (todas las cargas ordenadas por fecha)
+  const ordenadas = [...todasLasCargas].sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const fechasPrecio = ordenadas.map(c => c.fecha);
+  const precios = ordenadas.map(c => Number(c.precioLitro));
+
+  const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false }
+    },
+    scales: {
+      x: {
+        ticks: { color: "#8b9bb4", maxRotation: 45 },
+        grid: { color: "#2d3a4f" }
+      },
+      y: {
+        ticks: { color: "#8b9bb4" },
+        grid: { color: "#2d3a4f" }
+      }
+    }
+  };
+
+  // Gráfico litros
+  if (chartLitros) chartLitros.destroy();
+  chartLitros = new Chart(document.getElementById("chart-litros"), {
+    type: "bar",
+    data: {
+      labels: anos,
+      datasets: [{
+        data: litrosData,
+        backgroundColor: "#3b82f6",
+        borderRadius: 6
+      }]
+    },
+    options: commonOptions
+  });
+
+  // Gráfico gasto
+  if (chartGasto) chartGasto.destroy();
+  chartGasto = new Chart(document.getElementById("chart-gasto"), {
+    type: "bar",
+    data: {
+      labels: anos,
+      datasets: [{
+        data: gastoData,
+        backgroundColor: "#22c55e",
+        borderRadius: 6
+      }]
+    },
+    options: commonOptions
+  });
+
+  // Gráfico evolución precio
+  if (chartPrecio) chartPrecio.destroy();
+  chartPrecio = new Chart(document.getElementById("chart-precio"), {
+    type: "line",
+    data: {
+      labels: fechasPrecio,
+      datasets: [{
+        data: precios,
+        borderColor: "#f59e0b",
+        backgroundColor: "rgba(245, 158, 11, 0.1)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 2,
+        pointHoverRadius: 5
+      }]
+    },
+    options: {
+      ...commonOptions,
+      scales: {
+        ...commonOptions.scales,
+        x: {
+          ...commonOptions.scales.x,
+          ticks: {
+            color: "#8b9bb4",
+            maxTicksLimit: 12,
+            callback: function(val, i) {
+              const fecha = this.getLabelForValue(val);
+              return fecha ? fecha.slice(0, 4) : "";
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ===== Formularios =====
 document.getElementById("form-carga").addEventListener("submit", async (e) => {
   e.preventDefault();
-
   const nueva = {
     fecha: document.getElementById("carga-fecha").value,
     litros: parseFloat(document.getElementById("carga-litros").value),
     precioLitro: parseFloat(document.getElementById("carga-precio").value),
     importe: parseFloat(document.getElementById("carga-importe").value)
   };
-
-  const nuevaRef = push(ref(db, "cargas"));
-  await set(nuevaRef, nueva);
-
+  await set(push(ref(db, "cargas")), nueva);
   e.target.reset();
   document.getElementById("carga-fecha").value = hoy;
   inputImporte.value = "";
 });
 
-// ===== Formulario Nueva Bitácora =====
 document.getElementById("form-bitacora").addEventListener("submit", async (e) => {
   e.preventDefault();
-
   const cm = document.getElementById("bit-cm").value;
   const litros = document.getElementById("bit-litros").value;
   const desc = document.getElementById("bit-desc").value;
@@ -139,10 +298,7 @@ document.getElementById("form-bitacora").addEventListener("submit", async (e) =>
     litrosDeposito: litros ? parseFloat(litros) : null,
     descripcion: desc || null
   };
-
-  const nuevaRef = push(ref(db, "bitacora"));
-  await set(nuevaRef, nueva);
-
+  await set(push(ref(db, "bitacora")), nueva);
   e.target.reset();
   document.getElementById("bit-fecha").value = hoy;
 });

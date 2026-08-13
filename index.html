@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -37,12 +38,55 @@
 
     <!-- Pestañas -->
     <nav class="tabs">
-      <button class="tab active" data-tab="cargas">Cargas</button>
+      <button class="tab active" data-tab="resumen">Resumen</button>
+      <button class="tab" data-tab="cargas">Cargas</button>
       <button class="tab" data-tab="bitacora">Bitácora</button>
     </nav>
 
+    <!-- Sección Resumen (gráficos) -->
+    <section id="tab-resumen" class="tab-content active">
+      <div class="card">
+        <h2>Consumo por año (litros)</h2>
+        <div class="chart-container">
+          <canvas id="chart-litros"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Gasto por año (€)</h2>
+        <div class="chart-container">
+          <canvas id="chart-gasto"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Evolución del precio (€/L)</h2>
+        <div class="chart-container">
+          <canvas id="chart-precio"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Resumen por año</h2>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Año</th>
+                <th>Cargas</th>
+                <th>Litros</th>
+                <th>Gasto €</th>
+                <th>Precio medio</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-anual"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- Sección Cargas -->
-    <section id="tab-cargas" class="tab-content active">
+    <section id="tab-cargas" class="tab-content">
       <div class="card">
         <h2>Nueva carga</h2>
         <form id="form-carga">
@@ -71,7 +115,12 @@
       <div class="card">
         <div class="card-header">
           <h2>Histórico de cargas</h2>
-          <span class="badge" id="cargas-count">0</span>
+          <div class="filters">
+            <select id="filtro-ano-cargas">
+              <option value="todos">Todos los años</option>
+            </select>
+            <span class="badge" id="cargas-count">0</span>
+          </div>
         </div>
         <div class="table-wrapper">
           <table>
