@@ -16,6 +16,7 @@ const db = getDatabase(app);
 
 let todasLasCargas = [];
 let todaLaBitacora = [];
+let todosLosMantenimientos = [];
 let chartLitros = null;
 let chartGasto = null;
 let chartPrecio = null;
@@ -34,6 +35,7 @@ document.querySelectorAll(".tab").forEach(btn => {
 const hoy = new Date().toISOString().slice(0, 10);
 document.getElementById("carga-fecha").value = hoy;
 document.getElementById("bit-fecha").value = hoy;
+document.getElementById("mant-fecha").value = hoy;
 
 // ===== Cálculo importe =====
 const inputLitros = document.getElementById("carga-litros");
@@ -76,6 +78,17 @@ onValue(ref(db, "bitacora"), (snapshot) => {
   calcularTemporadas();
 });
 
+// ===== Cargar Mantenimientos =====
+onValue(ref(db, "mantenimientos"), (snapshot) => {
+  const data = snapshot.val() || {};
+  todosLosMantenimientos = Object.entries(data)
+    .map(([id, m]) => ({ id, ...m }))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+  renderMantenimientos();
+  actualizarStats();
+});
+
 // ===== Render Bitácora =====
 function renderBitacora() {
   const tbody = document.getElementById("tabla-bitacora");
@@ -103,6 +116,24 @@ function renderBitacora() {
   }).join("");
 
   document.getElementById("bitacora-count").textContent = todaLaBitacora.length;
+}
+
+// ===== Render Mantenimientos =====
+function renderMantenimientos() {
+  const tbody = document.getElementById("tabla-mantenimientos");
+  tbody.innerHTML = todosLosMantenimientos.map(m => `
+    <tr>
+      <td>${formatearFecha(m.fecha)}</td>
+      <td>${Number(m.importe).toFixed(2)}</td>
+      <td style="white-space: normal; max-width: 320px;">${m.descripcion || "—"}</td>
+      <td>
+        <button class="btn-icon" onclick="editarMantenimiento('${m.id}')">✏️</button>
+        <button class="btn-icon danger" onclick="borrarMantenimiento('${m.id}')">🗑️</button>
+      </td>
+    </tr>
+  `).join("");
+
+  document.getElementById("mant-count").textContent = todosLosMantenimientos.length;
 }
 
 // ===== Filtro año =====
@@ -142,13 +173,14 @@ function renderCargas() {
 // ===== Stats =====
 function actualizarStats() {
   const totalLitros = todasLasCargas.reduce((s, c) => s + Number(c.litros), 0);
-  const totalGasto = todasLasCargas.reduce((s, c) => s + Number(c.importe), 0);
-  const precioMedio = totalLitros > 0 ? totalGasto / totalLitros : 0;
+  const gastoCombustible = todasLasCargas.reduce((s, c) => s + Number(c.importe), 0);
+  const gastoMantenimiento = todosLosMantenimientos.reduce((s, m) => s + Number(m.importe), 0);
+  const gastoTotal = gastoCombustible + gastoMantenimiento;
 
   document.getElementById("total-litros").textContent = totalLitros.toLocaleString("es-ES", { maximumFractionDigits: 0 });
-  document.getElementById("total-gasto").textContent = totalGasto.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
-  document.getElementById("num-cargas").textContent = todasLasCargas.length;
-  document.getElementById("precio-medio").textContent = precioMedio.toFixed(3);
+  document.getElementById("gasto-combustible").textContent = gastoCombustible.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+  document.getElementById("gasto-mantenimiento").textContent = gastoMantenimiento.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+  document.getElementById("gasto-total").textContent = gastoTotal.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
 }
 
 // ===== Nivel depósito =====
@@ -184,7 +216,6 @@ function actualizarComparativa() {
   const gastoActual = cargasActual.reduce((s, c) => s + Number(c.importe), 0);
   const gastoAnterior = cargasAnterior.reduce((s, c) => s + Number(c.importe), 0);
 
-  // Litros
   if (litrosAnterior > 0) {
     const diff = litrosActual - litrosAnterior;
     const pct = ((diff / litrosAnterior) * 100).toFixed(1);
@@ -195,7 +226,6 @@ function actualizarComparativa() {
   }
   document.getElementById("comp-litros-label").textContent = `${anoActual} vs ${anoAnterior} (litros)`;
 
-  // Gasto
   if (gastoAnterior > 0) {
     const diff = gastoActual - gastoAnterior;
     const pct = ((diff / gastoAnterior) * 100).toFixed(1);
@@ -207,9 +237,9 @@ function actualizarComparativa() {
   document.getElementById("comp-gasto-label").textContent = `${anoActual} vs ${anoAnterior} (gasto)`;
 }
 
-// ===== Temporadas (Encendido → Apagado) =====
+// ===== Temporadas =====
 function calcularTemporadas() {
-  if (todaLaBitacora.length === 0 || todasLasCargas.length === 0) return;
+  if (todaLaBitacora.length === 0) return;
 
   const eventos = [...todaLaBitacora]
     .filter(b => b.tipo === "Encendido" || b.tipo === "Apagado")
@@ -228,19 +258,11 @@ function calcularTemporadas() {
       const gasto = cargasPeriodo.reduce((s, c) => s + Number(c.importe), 0);
       const litrosDia = dias > 0 ? (litros / dias) : 0;
 
-      temporadas.push({
-        inicio: inicio.fecha,
-        fin: ev.fecha,
-        dias,
-        litros,
-        litrosDia,
-        gasto
-      });
+      temporadas.push({ inicio: inicio.fecha, fin: ev.fecha, dias, litros, litrosDia, gasto });
       inicio = null;
     }
   }
 
-  // Si hay un Encendido sin Apagado (temporada actual)
   if (inicio) {
     const dias = diasEntre(inicio.fecha, hoy);
     const cargasPeriodo = todasLasCargas.filter(c => c.fecha >= inicio.fecha);
@@ -248,14 +270,7 @@ function calcularTemporadas() {
     const gasto = cargasPeriodo.reduce((s, c) => s + Number(c.importe), 0);
     const litrosDia = dias > 0 ? (litros / dias) : 0;
 
-    temporadas.push({
-      inicio: inicio.fecha,
-      fin: "En curso",
-      dias,
-      litros,
-      litrosDia,
-      gasto
-    });
+    temporadas.push({ inicio: inicio.fecha, fin: "En curso", dias, litros, litrosDia, gasto });
   }
 
   temporadas.reverse();
@@ -278,7 +293,7 @@ function diasEntre(f1, f2) {
   return Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)));
 }
 
-// ===== Agrupar por año + tabla =====
+// ===== Agrupar por año =====
 function agruparPorAno() {
   const mapa = {};
   todasLasCargas.forEach(c => {
@@ -394,7 +409,7 @@ function actualizarGraficos() {
   }
 }
 
-// ===== Formulario Cargas (crear / editar) =====
+// ===== Formulario Cargas =====
 document.getElementById("form-carga").addEventListener("submit", async (e) => {
   e.preventDefault();
   const id = document.getElementById("carga-id").value;
@@ -443,7 +458,7 @@ window.borrarCarga = async function(id) {
   await remove(ref(db, `cargas/${id}`));
 };
 
-// ===== Formulario Bitácora (crear / editar) =====
+// ===== Formulario Bitácora =====
 document.getElementById("form-bitacora").addEventListener("submit", async (e) => {
   e.preventDefault();
   const id = document.getElementById("bit-id").value;
@@ -495,6 +510,52 @@ window.editarBitacora = function(id) {
 window.borrarBitacora = async function(id) {
   if (!confirm("¿Borrar esta entrada de bitácora?")) return;
   await remove(ref(db, `bitacora/${id}`));
+};
+
+// ===== Formulario Mantenimientos =====
+document.getElementById("form-mantenimiento").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("mant-id").value;
+  const datos = {
+    fecha: document.getElementById("mant-fecha").value,
+    importe: parseFloat(document.getElementById("mant-importe").value),
+    descripcion: document.getElementById("mant-desc").value
+  };
+
+  if (id) {
+    await update(ref(db, `mantenimientos/${id}`), datos);
+  } else {
+    await set(push(ref(db, "mantenimientos")), datos);
+  }
+  resetFormMantenimiento();
+});
+
+document.getElementById("btn-mant-cancelar").addEventListener("click", resetFormMantenimiento);
+
+function resetFormMantenimiento() {
+  document.getElementById("form-mantenimiento").reset();
+  document.getElementById("mant-id").value = "";
+  document.getElementById("mant-fecha").value = hoy;
+  document.getElementById("btn-mant").textContent = "Añadir mantenimiento";
+  document.getElementById("btn-mant-cancelar").style.display = "none";
+}
+
+window.editarMantenimiento = function(id) {
+  const m = todosLosMantenimientos.find(x => x.id === id);
+  if (!m) return;
+  document.getElementById("mant-id").value = id;
+  document.getElementById("mant-fecha").value = m.fecha;
+  document.getElementById("mant-importe").value = m.importe;
+  document.getElementById("mant-desc").value = m.descripcion || "";
+  document.getElementById("btn-mant").textContent = "Guardar cambios";
+  document.getElementById("btn-mant-cancelar").style.display = "inline-flex";
+  document.querySelector('[data-tab="mantenimientos"]').click();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+window.borrarMantenimiento = async function(id) {
+  if (!confirm("¿Borrar este mantenimiento?")) return;
+  await remove(ref(db, `mantenimientos/${id}`));
 };
 
 // ===== Utilidades =====
