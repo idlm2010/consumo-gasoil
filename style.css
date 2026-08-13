@@ -344,3 +344,20 @@ footer {
 .delta-up { color: var(--danger); }
 .delta-down { color: var(--success); }
 .delta-same { color: var(--text-muted); }
+
+textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
