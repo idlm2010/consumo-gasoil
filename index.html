@@ -36,19 +36,19 @@
       </div>
     </section>
 
-    <!-- Nivel depósito + Comparativa -->
+    <!-- Consumo diario + Comparativas -->
     <section class="extra-stats">
       <div class="stat-card highlight">
-        <span class="stat-value" id="nivel-deposito">—</span>
-        <span class="stat-label">Nivel estimado depósito</span>
+        <span class="stat-value" id="consumo-diario">—</span>
+        <span class="stat-label">Consumo medio diario</span>
       </div>
       <div class="stat-card">
-        <span class="stat-value" id="comp-litros">—</span>
-        <span class="stat-label" id="comp-litros-label">vs año anterior (litros)</span>
+        <span class="stat-value" id="comp-actual">—</span>
+        <span class="stat-label" id="comp-actual-label">Año actual vs anterior</span>
       </div>
       <div class="stat-card">
-        <span class="stat-value" id="comp-gasto">—</span>
-        <span class="stat-label" id="comp-gasto-label">vs año anterior (gasto)</span>
+        <span class="stat-value" id="comp-anterior">—</span>
+        <span class="stat-label" id="comp-anterior-label">Año anterior vs 2 atrás</span>
       </div>
     </section>
 
@@ -94,7 +94,7 @@
     <section id="tab-temporadas" class="tab-content">
       <div class="card">
         <h2>Temporadas de calefacción</h2>
-        <p class="hint">Se calculan automáticamente emparejando Encendido → Apagado</p>
+        <p class="hint">Se calculan de un Encendido al siguiente Encendido (temporada completa)</p>
         <div class="table-wrapper">
           <table>
             <thead>
