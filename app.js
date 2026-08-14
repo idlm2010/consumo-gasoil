@@ -74,7 +74,6 @@ onValue(ref(db, "bitacora"), (snapshot) => {
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
 
   renderBitacora();
-  actualizarNivelDeposito();
   calcularTemporadas();
 });
 
@@ -124,7 +123,7 @@ function renderMantenimientos() {
   tbody.innerHTML = todosLosMantenimientos.map(m => `
     <tr>
       <td>${formatearFecha(m.fecha)}</td>
-      <td>${Number(m.importe).toFixed(2)}</td>
+      <td>${Number(m.importe).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       <td style="white-space: normal; max-width: 320px;">${m.descripcion || "—"}</td>
       <td>
         <button class="btn-icon" onclick="editarMantenimiento('${m.id}')">✏️</button>
@@ -181,96 +180,106 @@ function actualizarStats() {
   document.getElementById("gasto-combustible").textContent = gastoCombustible.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
   document.getElementById("gasto-mantenimiento").textContent = gastoMantenimiento.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
   document.getElementById("gasto-total").textContent = gastoTotal.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
-}
 
-// ===== Nivel depósito =====
-function actualizarNivelDeposito() {
-  const conNivel = todaLaBitacora
-    .filter(b => b.litrosDeposito != null || b.cm != null)
-    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+  // Consumo medio diario (desde la primera carga hasta hoy)
+  if (todasLasCargas.length > 0) {
+    const fechas = todasLasCargas.map(c => c.fecha).sort();
+    const primera = fechas[0];
+    const dias = diasEntre(primera, hoy);
+    const litrosDia = totalLitros / dias;
+    const costeDia = gastoCombustible / dias;
 
-  if (conNivel.length === 0) {
-    document.getElementById("nivel-deposito").textContent = "Sin datos";
-    return;
+    document.getElementById("consumo-diario").innerHTML =
+      `${litrosDia.toFixed(1)} L/día<br><small style="font-size:0.75em;opacity:0.8">${costeDia.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}/día</small>`;
+  } else {
+    document.getElementById("consumo-diario").textContent = "—";
   }
-
-  const ultimo = conNivel[0];
-  let texto = "";
-  if (ultimo.litrosDeposito != null) texto += `${ultimo.litrosDeposito} L`;
-  if (ultimo.cm != null) texto += (texto ? " · " : "") + `${ultimo.cm} cm`;
-  texto += ` (${formatearFecha(ultimo.fecha)})`;
-
-  document.getElementById("nivel-deposito").textContent = texto;
 }
 
-// ===== Comparativa año actual vs anterior =====
+// ===== Comparativa =====
 function actualizarComparativa() {
-  const anoActual = new Date().getFullYear().toString();
-  const anoAnterior = (parseInt(anoActual) - 1).toString();
+  const anoActual = new Date().getFullYear();
+  const ano1 = anoActual.toString();
+  const ano2 = (anoActual - 1).toString();
+  const ano3 = (anoActual - 2).toString();
 
-  const cargasActual = todasLasCargas.filter(c => c.fecha.startsWith(anoActual));
-  const cargasAnterior = todasLasCargas.filter(c => c.fecha.startsWith(anoAnterior));
+  const datos = (ano) => {
+    const cargas = todasLasCargas.filter(c => c.fecha.startsWith(ano));
+    return {
+      litros: cargas.reduce((s, c) => s + Number(c.litros), 0),
+      gasto: cargas.reduce((s, c) => s + Number(c.importe), 0)
+    };
+  };
 
-  const litrosActual = cargasActual.reduce((s, c) => s + Number(c.litros), 0);
-  const litrosAnterior = cargasAnterior.reduce((s, c) => s + Number(c.litros), 0);
-  const gastoActual = cargasActual.reduce((s, c) => s + Number(c.importe), 0);
-  const gastoAnterior = cargasAnterior.reduce((s, c) => s + Number(c.importe), 0);
+  const d1 = datos(ano1);
+  const d2 = datos(ano2);
+  const d3 = datos(ano3);
 
-  if (litrosAnterior > 0) {
-    const diff = litrosActual - litrosAnterior;
-    const pct = ((diff / litrosAnterior) * 100).toFixed(1);
-    const clase = diff > 0 ? "delta-up" : diff < 0 ? "delta-down" : "delta-same";
-    document.getElementById("comp-litros").innerHTML = `<span class="${clase}">${diff > 0 ? "+" : ""}${diff.toFixed(0)} L (${pct}%)</span>`;
-  } else {
-    document.getElementById("comp-litros").textContent = litrosActual > 0 ? `${litrosActual.toFixed(0)} L` : "—";
-  }
-  document.getElementById("comp-litros-label").textContent = `${anoActual} vs ${anoAnterior} (litros)`;
+  document.getElementById("comp-actual-label").textContent = `${ano1} vs ${ano2}`;
+  document.getElementById("comp-actual").innerHTML = formatearComparativa(d1, d2);
 
-  if (gastoAnterior > 0) {
-    const diff = gastoActual - gastoAnterior;
-    const pct = ((diff / gastoAnterior) * 100).toFixed(1);
-    const clase = diff > 0 ? "delta-up" : diff < 0 ? "delta-down" : "delta-same";
-    document.getElementById("comp-gasto").innerHTML = `<span class="${clase}">${diff > 0 ? "+" : ""}${diff.toFixed(0)} € (${pct}%)</span>`;
-  } else {
-    document.getElementById("comp-gasto").textContent = gastoActual > 0 ? `${gastoActual.toFixed(0)} €` : "—";
-  }
-  document.getElementById("comp-gasto-label").textContent = `${anoActual} vs ${anoAnterior} (gasto)`;
+  document.getElementById("comp-anterior-label").textContent = `${ano2} vs ${ano3}`;
+  document.getElementById("comp-anterior").innerHTML = formatearComparativa(d2, d3);
 }
 
-// ===== Temporadas =====
+function formatearComparativa(actual, anterior) {
+  if (anterior.litros === 0 && anterior.gasto === 0) {
+    return actual.litros > 0
+      ? `${actual.litros.toFixed(0)} L<br><small>${actual.gasto.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}</small>`
+      : "—";
+  }
+
+  const diffL = actual.litros - anterior.litros;
+  const pctL = ((diffL / anterior.litros) * 100).toFixed(1);
+  const claseL = diffL > 0 ? "delta-up" : diffL < 0 ? "delta-down" : "delta-same";
+
+  const diffG = actual.gasto - anterior.gasto;
+  const pctG = ((diffG / anterior.gasto) * 100).toFixed(1);
+  const claseG = diffG > 0 ? "delta-up" : diffG < 0 ? "delta-down" : "delta-same";
+
+  return `
+    <span class="${claseL}">${diffL > 0 ? "+" : ""}${diffL.toFixed(0)} L (${pctL}%)</span><br>
+    <small class="${claseG}">${diffG > 0 ? "+" : ""}${diffG.toFixed(0)} € (${pctG}%)</small>
+  `;
+}
+
+// ===== Temporadas (Encendido → siguiente Encendido) =====
 function calcularTemporadas() {
   if (todaLaBitacora.length === 0) return;
 
-  const eventos = [...todaLaBitacora]
-    .filter(b => b.tipo === "Encendido" || b.tipo === "Apagado")
+  const encendidos = [...todaLaBitacora]
+    .filter(b => b.tipo === "Encendido")
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
 
   const temporadas = [];
-  let inicio = null;
 
-  for (const ev of eventos) {
-    if (ev.tipo === "Encendido") {
-      inicio = ev;
-    } else if (ev.tipo === "Apagado" && inicio) {
-      const dias = diasEntre(inicio.fecha, ev.fecha);
-      const cargasPeriodo = todasLasCargas.filter(c => c.fecha >= inicio.fecha && c.fecha <= ev.fecha);
-      const litros = cargasPeriodo.reduce((s, c) => s + Number(c.litros), 0);
-      const gasto = cargasPeriodo.reduce((s, c) => s + Number(c.importe), 0);
-      const litrosDia = dias > 0 ? (litros / dias) : 0;
+  for (let i = 0; i < encendidos.length; i++) {
+    const inicio = encendidos[i];
+    const fin = encendidos[i + 1] || null;
 
-      temporadas.push({ inicio: inicio.fecha, fin: ev.fecha, dias, litros, litrosDia, gasto });
-      inicio = null;
-    }
-  }
+    const fechaFin = fin ? fin.fecha : hoy;
+    const esEnCurso = !fin;
+    const dias = diasEntre(inicio.fecha, fechaFin);
 
-  if (inicio) {
-    const dias = diasEntre(inicio.fecha, hoy);
-    const cargasPeriodo = todasLasCargas.filter(c => c.fecha >= inicio.fecha);
+    const cargasPeriodo = todasLasCargas.filter(c => {
+      if (fin) {
+        return c.fecha >= inicio.fecha && c.fecha < fin.fecha;
+      }
+      return c.fecha >= inicio.fecha;
+    });
+
     const litros = cargasPeriodo.reduce((s, c) => s + Number(c.litros), 0);
     const gasto = cargasPeriodo.reduce((s, c) => s + Number(c.importe), 0);
-    const litrosDia = dias > 0 ? (litros / dias) : 0;
+    const litrosDia = dias > 0 ? litros / dias : 0;
 
-    temporadas.push({ inicio: inicio.fecha, fin: "En curso", dias, litros, litrosDia, gasto });
+    temporadas.push({
+      inicio: inicio.fecha,
+      fin: esEnCurso ? "En curso" : fin.fecha,
+      dias,
+      litros,
+      litrosDia,
+      gasto
+    });
   }
 
   temporadas.reverse();
