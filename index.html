@@ -59,6 +59,7 @@
       <button class="tab" data-tab="cargas">Cargas</button>
       <button class="tab" data-tab="bitacora">Bitácora</button>
       <button class="tab" data-tab="mantenimientos">Mantenimientos</button>
+      <button class="tab" data-tab="urls">URLs</button>
     </nav>
 
     <!-- Resumen -->
@@ -271,8 +272,61 @@
       </div>
     </section>
 
+    <!-- URLs de utilidad -->
+    <section id="tab-urls" class="tab-content">
+      <div class="card">
+        <h2>Nueva URL</h2>
+        <form id="form-url">
+          <input type="hidden" id="url-id">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="url-fecha">Fecha de alta</label>
+              <input type="date" id="url-fecha" required>
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label for="url-link">URL</label>
+              <input type="url" id="url-link" placeholder="https://..." required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="url-desc">Descripción</label>
+            <input type="text" id="url-desc" placeholder="Breve descripción" required>
+          </div>
+          <div class="form-group">
+            <label for="url-obs">Observaciones</label>
+            <textarea id="url-obs" rows="3" placeholder="Notas adicionales (opcional)"></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="btn-url">Añadir URL</button>
+            <button type="button" class="btn btn-secondary" id="btn-url-cancelar" style="display:none">Cancelar</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>URLs guardadas</h2>
+          <span class="badge" id="url-count">0</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Descripción</th>
+                <th>URL</th>
+                <th>Observaciones</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tabla-urls"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <footer>
-      <p>Datos almacenados en Firebase · Alojado en GitHub Pages</p>
+      <p>Datos almacenados en Firebase · Alojado en GitHub Pages · Desarrollado con Grok</p>
     </footer>
   </div>
 
