@@ -77,15 +77,30 @@ header h1 {
   color: var(--text-muted);
 }
 
+/* Extra stats */
+.extra-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.stat-card.highlight {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, #1a2332, #1e3a5f);
+}
+
 /* Tabs */
 .tabs {
   display: flex;
   gap: 8px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .tab {
   flex: 1;
+  min-width: 100px;
   padding: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -152,6 +167,12 @@ header h1 {
   border-radius: 20px;
 }
 
+.hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
 /* Forms */
 .form-row {
   display: grid;
@@ -164,6 +185,7 @@ header h1 {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  margin-bottom: 12px;
 }
 
 .form-group label {
@@ -172,7 +194,7 @@ header h1 {
   font-weight: 500;
 }
 
-input, select {
+input, select, textarea {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -182,13 +204,24 @@ input, select {
   font-family: inherit;
 }
 
-input:focus, select:focus {
+input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--primary);
 }
 
 input[readonly] {
   opacity: 0.7;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
 }
 
 .btn {
@@ -208,11 +241,39 @@ input[readonly] {
 .btn-primary {
   background: var(--primary);
   color: white;
-  margin-top: 8px;
 }
 
 .btn-primary:hover {
   background: var(--primary-hover);
+}
+
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--border);
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+}
+
+.btn-icon:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.btn-icon.danger:hover {
+  color: var(--danger);
 }
 
 /* Table */
@@ -251,11 +312,17 @@ tbody tr:hover {
 .tipo-mejora { color: var(--primary); }
 .tipo-informativo { color: var(--text-muted); }
 
-footer {
-  text-align: center;
-  margin-top: 32px;
-  color: var(--text-muted);
-  font-size: 0.8rem;
+.delta-up { color: var(--danger); }
+.delta-down { color: var(--success); }
+.delta-same { color: var(--text-muted); }
+
+.url-link {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.url-link:hover {
+  text-decoration: underline;
 }
 
 /* Charts */
@@ -281,83 +348,15 @@ footer {
   font-size: 0.85rem;
 }
 
+footer {
+  text-align: center;
+  margin-top: 32px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
 @media (max-width: 600px) {
   .stats {
     grid-template-columns: 1fr 1fr;
   }
-}
-
-/* Extra stats */
-.extra-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-bottom: 28px;
-}
-
-.stat-card.highlight {
-  border-color: var(--primary);
-  background: linear-gradient(135deg, #1a2332, #1e3a5f);
-}
-
-.hint {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin-bottom: 16px;
-}
-
-.form-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-.btn-secondary {
-  background: var(--surface2);
-  color: var(--text);
-  border: 1px solid var(--border);
-}
-
-.btn-secondary:hover {
-  background: var(--border);
-}
-
-.btn-icon {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 4px 8px;
-  font-size: 0.9rem;
-  border-radius: 6px;
-}
-
-.btn-icon:hover {
-  background: var(--surface2);
-  color: var(--text);
-}
-
-.btn-icon.danger:hover {
-  color: var(--danger);
-}
-
-.delta-up { color: var(--danger); }
-.delta-down { color: var(--success); }
-.delta-same { color: var(--text-muted); }
-
-textarea {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  color: var(--text);
-  font-size: 0.95rem;
-  font-family: inherit;
-  resize: vertical;
-  min-height: 80px;
-}
-
-textarea:focus {
-  outline: none;
-  border-color: var(--primary);
 }
