@@ -34,10 +34,18 @@ document.querySelectorAll(".tab").forEach(btn => {
 
 // ===== Fecha hoy =====
 const hoy = new Date().toISOString().slice(0, 10);
-document.getElementById("carga-fecha").value = hoy;
-document.getElementById("bit-fecha").value = hoy;
-document.getElementById("mant-fecha").value = hoy;
-document.getElementById("url-fecha").value = hoy;
+
+function setFechasHoy() {
+  const carga = document.getElementById("carga-fecha");
+  const bit = document.getElementById("bit-fecha");
+  const mant = document.getElementById("mant-fecha");
+  const url = document.getElementById("url-fecha");
+  if (carga) carga.value = hoy;
+  if (bit) bit.value = hoy;
+  if (mant) mant.value = hoy;
+  if (url) url.value = hoy;
+}
+setFechasHoy();
 
 // ===== Cálculo importe =====
 const inputLitros = document.getElementById("carga-litros");
@@ -49,8 +57,8 @@ function calcularImporte() {
   const precio = parseFloat(inputPrecio.value) || 0;
   inputImporte.value = (litros * precio).toFixed(2);
 }
-inputLitros.addEventListener("input", calcularImporte);
-inputPrecio.addEventListener("input", calcularImporte);
+if (inputLitros) inputLitros.addEventListener("input", calcularImporte);
+if (inputPrecio) inputPrecio.addEventListener("input", calcularImporte);
 
 // ===== Cargar Cargas =====
 onValue(ref(db, "cargas"), (snapshot) => {
@@ -95,7 +103,7 @@ onValue(ref(db, "urls"), (snapshot) => {
   const data = snapshot.val() || {};
   todasLasUrls = Object.entries(data)
     .map(([id, u]) => ({ id, ...u }))
-    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+    .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
 
   renderUrls();
 });
@@ -103,6 +111,7 @@ onValue(ref(db, "urls"), (snapshot) => {
 // ===== Render Bitácora =====
 function renderBitacora() {
   const tbody = document.getElementById("tabla-bitacora");
+  if (!tbody) return;
   tbody.innerHTML = todaLaBitacora.map(b => {
     const tipoClass = {
       "Encendido": "tipo-encendido",
@@ -126,12 +135,14 @@ function renderBitacora() {
     `;
   }).join("");
 
-  document.getElementById("bitacora-count").textContent = todaLaBitacora.length;
+  const badge = document.getElementById("bitacora-count");
+  if (badge) badge.textContent = todaLaBitacora.length;
 }
 
 // ===== Render Mantenimientos =====
 function renderMantenimientos() {
   const tbody = document.getElementById("tabla-mantenimientos");
+  if (!tbody) return;
   tbody.innerHTML = todosLosMantenimientos.map(m => `
     <tr>
       <td>${formatearFecha(m.fecha)}</td>
@@ -144,22 +155,24 @@ function renderMantenimientos() {
     </tr>
   `).join("");
 
-  document.getElementById("mant-count").textContent = todosLosMantenimientos.length;
+  const badge = document.getElementById("mant-count");
+  if (badge) badge.textContent = todosLosMantenimientos.length;
 }
 
 // ===== Render URLs =====
 function renderUrls() {
   const tbody = document.getElementById("tabla-urls");
+  if (!tbody) return;
   tbody.innerHTML = todasLasUrls.map(u => {
-    const urlCorta = u.url.length > 40 ? u.url.slice(0, 37) + "..." : u.url;
+    const urlCorta = (u.url || "").length > 40 ? u.url.slice(0, 37) + "..." : (u.url || "");
     return `
       <tr>
         <td>${formatearFecha(u.fecha)}</td>
-        <td style="white-space: normal; max-width: 180px;">${u.descripcion || "—"}</td>
+        <td style="white-space: normal; max-width: 180px;">${escapeHtml(u.descripcion) || "—"}</td>
         <td style="white-space: normal; max-width: 200px;">
           <a href="${escapeHtml(u.url)}" target="_blank" rel="noopener noreferrer" class="url-link" title="${escapeHtml(u.url)}">${escapeHtml(urlCorta)}</a>
         </td>
-        <td style="white-space: normal; max-width: 200px;">${u.observaciones || "—"}</td>
+        <td style="white-space: normal; max-width: 200px;">${escapeHtml(u.observaciones) || "—"}</td>
         <td>
           <button class="btn-icon" onclick="abrirUrl('${escapeAttr(u.url)}')" title="Abrir en nueva ventana">🔗</button>
           <button class="btn-icon" onclick="editarUrl('${u.id}')">✏️</button>
@@ -169,7 +182,8 @@ function renderUrls() {
     `;
   }).join("");
 
-  document.getElementById("url-count").textContent = todasLasUrls.length;
+  const badge = document.getElementById("url-count");
+  if (badge) badge.textContent = todasLasUrls.length;
 }
 
 function escapeHtml(str) {
@@ -190,10 +204,12 @@ function escapeAttr(str) {
 }
 
 // ===== Filtro año =====
-document.getElementById("filtro-ano-cargas").addEventListener("change", renderCargas);
+const filtroAno = document.getElementById("filtro-ano-cargas");
+if (filtroAno) filtroAno.addEventListener("change", renderCargas);
 
 function actualizarFiltroAnos() {
   const select = document.getElementById("filtro-ano-cargas");
+  if (!select) return;
   const anos = [...new Set(todasLasCargas.map(c => c.fecha.slice(0, 4)))].sort((a, b) => b - a);
   const valorActual = select.value;
   select.innerHTML = `<option value="todos">Todos los años</option>` +
@@ -202,12 +218,15 @@ function actualizarFiltroAnos() {
 }
 
 function renderCargas() {
-  const filtro = document.getElementById("filtro-ano-cargas").value;
+  const select = document.getElementById("filtro-ano-cargas");
+  const filtro = select ? select.value : "todos";
   const lista = filtro === "todos"
     ? todasLasCargas
     : todasLasCargas.filter(c => c.fecha.startsWith(filtro));
 
-  document.getElementById("tabla-cargas").innerHTML = lista.map(c => `
+  const tbody = document.getElementById("tabla-cargas");
+  if (!tbody) return;
+  tbody.innerHTML = lista.map(c => `
     <tr>
       <td>${formatearFecha(c.fecha)}</td>
       <td>${c.litros}</td>
@@ -220,7 +239,8 @@ function renderCargas() {
     </tr>
   `).join("");
 
-  document.getElementById("cargas-count").textContent = lista.length;
+  const badge = document.getElementById("cargas-count");
+  if (badge) badge.textContent = lista.length;
 }
 
 // ===== Stats =====
@@ -230,10 +250,11 @@ function actualizarStats() {
   const gastoMantenimiento = todosLosMantenimientos.reduce((s, m) => s + Number(m.importe), 0);
   const gastoTotal = gastoCombustible + gastoMantenimiento;
 
-  document.getElementById("total-litros").textContent = totalLitros.toLocaleString("es-ES", { maximumFractionDigits: 0 });
-  document.getElementById("gasto-combustible").textContent = gastoCombustible.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
-  document.getElementById("gasto-mantenimiento").textContent = gastoMantenimiento.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
-  document.getElementById("gasto-total").textContent = gastoTotal.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+  const el = (id) => document.getElementById(id);
+  if (el("total-litros")) el("total-litros").textContent = totalLitros.toLocaleString("es-ES", { maximumFractionDigits: 0 });
+  if (el("gasto-combustible")) el("gasto-combustible").textContent = gastoCombustible.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+  if (el("gasto-mantenimiento")) el("gasto-mantenimiento").textContent = gastoMantenimiento.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+  if (el("gasto-total")) el("gasto-total").textContent = gastoTotal.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
 
   if (todasLasCargas.length > 0) {
     const fechas = todasLasCargas.map(c => c.fecha).sort();
@@ -242,10 +263,12 @@ function actualizarStats() {
     const litrosDia = totalLitros / dias;
     const costeDia = gastoCombustible / dias;
 
-    document.getElementById("consumo-diario").innerHTML =
-      `${litrosDia.toFixed(1)} L/día<br><small style="font-size:0.75em;opacity:0.8">${costeDia.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}/día</small>`;
-  } else {
-    document.getElementById("consumo-diario").textContent = "—";
+    if (el("consumo-diario")) {
+      el("consumo-diario").innerHTML =
+        `${litrosDia.toFixed(1)} L/día<br><small style="font-size:0.75em;opacity:0.8">${costeDia.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}/día</small>`;
+    }
+  } else if (el("consumo-diario")) {
+    el("consumo-diario").textContent = "—";
   }
 }
 
@@ -268,11 +291,15 @@ function actualizarComparativa() {
   const d2 = datos(ano2);
   const d3 = datos(ano3);
 
-  document.getElementById("comp-actual-label").textContent = `${ano1} vs ${ano2}`;
-  document.getElementById("comp-actual").innerHTML = formatearComparativa(d1, d2);
+  const lab1 = document.getElementById("comp-actual-label");
+  const lab2 = document.getElementById("comp-anterior-label");
+  if (lab1) lab1.textContent = `${ano1} vs ${ano2}`;
+  if (lab2) lab2.textContent = `${ano2} vs ${ano3}`;
 
-  document.getElementById("comp-anterior-label").textContent = `${ano2} vs ${ano3}`;
-  document.getElementById("comp-anterior").innerHTML = formatearComparativa(d2, d3);
+  const el1 = document.getElementById("comp-actual");
+  const el2 = document.getElementById("comp-anterior");
+  if (el1) el1.innerHTML = formatearComparativa(d1, d2);
+  if (el2) el2.innerHTML = formatearComparativa(d2, d3);
 }
 
 function formatearComparativa(actual, anterior) {
@@ -296,9 +323,14 @@ function formatearComparativa(actual, anterior) {
   `;
 }
 
-// ===== Temporadas (Encendido → siguiente Encendido) =====
+// ===== Temporadas =====
 function calcularTemporadas() {
-  if (todaLaBitacora.length === 0) return;
+  const tbody = document.getElementById("tabla-temporadas");
+  if (!tbody) return;
+  if (todaLaBitacora.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6">No hay temporadas calculables</td></tr>`;
+    return;
+  }
 
   const encendidos = [...todaLaBitacora]
     .filter(b => b.tipo === "Encendido")
@@ -337,7 +369,7 @@ function calcularTemporadas() {
 
   temporadas.reverse();
 
-  document.getElementById("tabla-temporadas").innerHTML = temporadas.map(t => `
+  tbody.innerHTML = temporadas.map(t => `
     <tr>
       <td>${formatearFecha(t.inicio)}</td>
       <td>${t.fin === "En curso" ? "<em>En curso</em>" : formatearFecha(t.fin)}</td>
@@ -369,10 +401,12 @@ function agruparPorAno() {
 }
 
 function actualizarTablaAnual() {
+  const tbody = document.getElementById("tabla-anual");
+  if (!tbody) return;
   const porAno = agruparPorAno();
   const anos = Object.keys(porAno).sort((a, b) => b - a);
 
-  document.getElementById("tabla-anual").innerHTML = anos.map(ano => {
+  tbody.innerHTML = anos.map(ano => {
     const d = porAno[ano];
     const medio = d.litros > 0 ? (d.gasto / d.litros).toFixed(3) : "—";
     return `
@@ -472,33 +506,47 @@ function actualizarGraficos() {
 }
 
 // ===== Formulario Cargas =====
-document.getElementById("form-carga").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const id = document.getElementById("carga-id").value;
-  const datos = {
-    fecha: document.getElementById("carga-fecha").value,
-    litros: parseFloat(document.getElementById("carga-litros").value),
-    precioLitro: parseFloat(document.getElementById("carga-precio").value),
-    importe: parseFloat(document.getElementById("carga-importe").value)
-  };
+const formCarga = document.getElementById("form-carga");
+if (formCarga) {
+  formCarga.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const id = document.getElementById("carga-id").value;
+      const datos = {
+        fecha: document.getElementById("carga-fecha").value,
+        litros: parseFloat(document.getElementById("carga-litros").value),
+        precioLitro: parseFloat(document.getElementById("carga-precio").value),
+        importe: parseFloat(document.getElementById("carga-importe").value)
+      };
 
-  if (id) {
-    await update(ref(db, `cargas/${id}`), datos);
-  } else {
-    await set(push(ref(db, "cargas")), datos);
-  }
-  resetFormCarga();
-});
+      if (id) {
+        await update(ref(db, `cargas/${id}`), datos);
+      } else {
+        await set(push(ref(db, "cargas")), datos);
+      }
+      resetFormCarga();
+    } catch (err) {
+      console.error(err);
+      alert("Error al guardar la carga: " + err.message);
+    }
+  });
+}
 
-document.getElementById("btn-carga-cancelar").addEventListener("click", resetFormCarga);
+const btnCargaCancelar = document.getElementById("btn-carga-cancelar");
+if (btnCargaCancelar) btnCargaCancelar.addEventListener("click", resetFormCarga);
 
 function resetFormCarga() {
-  document.getElementById("form-carga").reset();
-  document.getElementById("carga-id").value = "";
-  document.getElementById("carga-fecha").value = hoy;
-  document.getElementById("btn-carga").textContent = "Añadir carga";
-  document.getElementById("btn-carga-cancelar").style.display = "none";
-  inputImporte.value = "";
+  const form = document.getElementById("form-carga");
+  if (form) form.reset();
+  const idEl = document.getElementById("carga-id");
+  if (idEl) idEl.value = "";
+  const fechaEl = document.getElementById("carga-fecha");
+  if (fechaEl) fechaEl.value = hoy;
+  const btn = document.getElementById("btn-carga");
+  if (btn) btn.textContent = "Añadir carga";
+  const btnCancel = document.getElementById("btn-carga-cancelar");
+  if (btnCancel) btnCancel.style.display = "none";
+  if (inputImporte) inputImporte.value = "";
 }
 
 window.editarCarga = function(id) {
@@ -517,41 +565,60 @@ window.editarCarga = function(id) {
 
 window.borrarCarga = async function(id) {
   if (!confirm("¿Borrar esta carga?")) return;
-  await remove(ref(db, `cargas/${id}`));
+  try {
+    await remove(ref(db, `cargas/${id}`));
+  } catch (err) {
+    console.error(err);
+    alert("Error al borrar: " + err.message);
+  }
 };
 
 // ===== Formulario Bitácora =====
-document.getElementById("form-bitacora").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const id = document.getElementById("bit-id").value;
-  const cm = document.getElementById("bit-cm").value;
-  const litros = document.getElementById("bit-litros").value;
-  const desc = document.getElementById("bit-desc").value;
+const formBit = document.getElementById("form-bitacora");
+if (formBit) {
+  formBit.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const id = document.getElementById("bit-id").value;
+      const cm = document.getElementById("bit-cm").value;
+      const litros = document.getElementById("bit-litros").value;
+      const desc = document.getElementById("bit-desc").value;
 
-  const datos = {
-    fecha: document.getElementById("bit-fecha").value,
-    tipo: document.getElementById("bit-tipo").value,
-    cm: cm ? parseFloat(cm) : null,
-    litrosDeposito: litros ? parseFloat(litros) : null,
-    descripcion: desc || null
-  };
+      const datos = {
+        fecha: document.getElementById("bit-fecha").value,
+        tipo: document.getElementById("bit-tipo").value,
+        cm: cm ? parseFloat(cm) : null,
+        litrosDeposito: litros ? parseFloat(litros) : null,
+        descripcion: desc || null
+      };
 
-  if (id) {
-    await update(ref(db, `bitacora/${id}`), datos);
-  } else {
-    await set(push(ref(db, "bitacora")), datos);
-  }
-  resetFormBitacora();
-});
+      if (id) {
+        await update(ref(db, `bitacora/${id}`), datos);
+      } else {
+        await set(push(ref(db, "bitacora")), datos);
+      }
+      resetFormBitacora();
+    } catch (err) {
+      console.error(err);
+      alert("Error al guardar la bitácora: " + err.message);
+    }
+  });
+}
 
-document.getElementById("btn-bit-cancelar").addEventListener("click", resetFormBitacora);
+const btnBitCancelar = document.getElementById("btn-bit-cancelar");
+if (btnBitCancelar) btnBitCancelar.addEventListener("click", resetFormBitacora);
 
 function resetFormBitacora() {
-  document.getElementById("form-bitacora").reset();
-  document.getElementById("bit-id").value = "";
-  document.getElementById("bit-fecha").value = hoy;
-  document.getElementById("btn-bit").textContent = "Añadir entrada";
-  document.getElementById("btn-bit-cancelar").style.display = "none";
+  const form = document.getElementById("form-bitacora");
+  if (form) form.reset();
+  const idEl = document.getElementById("bit-id");
+  if (idEl) idEl.value = "";
+  const fechaEl = document.getElementById("bit-fecha");
+  if (fechaEl) fechaEl.value = hoy;
+  const btn = document.getElementById("btn-bit");
+  if (btn) btn.textContent = "Añadir entrada";
+  const btnCancel = document.getElementById("btn-bit-cancelar");
+  if (btnCancel) btnCancel.style.display = "none";
 }
 
 window.editarBitacora = function(id) {
@@ -571,35 +638,54 @@ window.editarBitacora = function(id) {
 
 window.borrarBitacora = async function(id) {
   if (!confirm("¿Borrar esta entrada de bitácora?")) return;
-  await remove(ref(db, `bitacora/${id}`));
+  try {
+    await remove(ref(db, `bitacora/${id}`));
+  } catch (err) {
+    console.error(err);
+    alert("Error al borrar: " + err.message);
+  }
 };
 
 // ===== Formulario Mantenimientos =====
-document.getElementById("form-mantenimiento").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const id = document.getElementById("mant-id").value;
-  const datos = {
-    fecha: document.getElementById("mant-fecha").value,
-    importe: parseFloat(document.getElementById("mant-importe").value),
-    descripcion: document.getElementById("mant-desc").value
-  };
+const formMant = document.getElementById("form-mantenimiento");
+if (formMant) {
+  formMant.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const id = document.getElementById("mant-id").value;
+      const datos = {
+        fecha: document.getElementById("mant-fecha").value,
+        importe: parseFloat(document.getElementById("mant-importe").value),
+        descripcion: document.getElementById("mant-desc").value
+      };
 
-  if (id) {
-    await update(ref(db, `mantenimientos/${id}`), datos);
-  } else {
-    await set(push(ref(db, "mantenimientos")), datos);
-  }
-  resetFormMantenimiento();
-});
+      if (id) {
+        await update(ref(db, `mantenimientos/${id}`), datos);
+      } else {
+        await set(push(ref(db, "mantenimientos")), datos);
+      }
+      resetFormMantenimiento();
+    } catch (err) {
+      console.error(err);
+      alert("Error al guardar el mantenimiento: " + err.message);
+    }
+  });
+}
 
-document.getElementById("btn-mant-cancelar").addEventListener("click", resetFormMantenimiento);
+const btnMantCancelar = document.getElementById("btn-mant-cancelar");
+if (btnMantCancelar) btnMantCancelar.addEventListener("click", resetFormMantenimiento);
 
 function resetFormMantenimiento() {
-  document.getElementById("form-mantenimiento").reset();
-  document.getElementById("mant-id").value = "";
-  document.getElementById("mant-fecha").value = hoy;
-  document.getElementById("btn-mant").textContent = "Añadir mantenimiento";
-  document.getElementById("btn-mant-cancelar").style.display = "none";
+  const form = document.getElementById("form-mantenimiento");
+  if (form) form.reset();
+  const idEl = document.getElementById("mant-id");
+  if (idEl) idEl.value = "";
+  const fechaEl = document.getElementById("mant-fecha");
+  if (fechaEl) fechaEl.value = hoy;
+  const btn = document.getElementById("btn-mant");
+  if (btn) btn.textContent = "Añadir mantenimiento";
+  const btnCancel = document.getElementById("btn-mant-cancelar");
+  if (btnCancel) btnCancel.style.display = "none";
 }
 
 window.editarMantenimiento = function(id) {
@@ -617,41 +703,65 @@ window.editarMantenimiento = function(id) {
 
 window.borrarMantenimiento = async function(id) {
   if (!confirm("¿Borrar este mantenimiento?")) return;
-  await remove(ref(db, `mantenimientos/${id}`));
+  try {
+    await remove(ref(db, `mantenimientos/${id}`));
+  } catch (err) {
+    console.error(err);
+    alert("Error al borrar: " + err.message);
+  }
 };
 
 // ===== Formulario URLs =====
-document.getElementById("form-url").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const id = document.getElementById("url-id").value;
-  let urlValue = document.getElementById("url-link").value.trim();
-  if (urlValue && !/^https?:\/\//i.test(urlValue)) {
-    urlValue = "https://" + urlValue;
-  }
+const formUrl = document.getElementById("form-url");
+if (formUrl) {
+  formUrl.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const id = document.getElementById("url-id").value;
+      let urlValue = document.getElementById("url-link").value.trim();
+      if (urlValue && !/^https?:\/\//i.test(urlValue)) {
+        urlValue = "https://" + urlValue;
+      }
 
-  const datos = {
-    fecha: document.getElementById("url-fecha").value,
-    url: urlValue,
-    descripcion: document.getElementById("url-desc").value.trim(),
-    observaciones: document.getElementById("url-obs").value.trim() || null
-  };
+      const datos = {
+        fecha: document.getElementById("url-fecha").value || hoy,
+        url: urlValue,
+        descripcion: document.getElementById("url-desc").value.trim(),
+        observaciones: document.getElementById("url-obs").value.trim() || null
+      };
 
-  if (id) {
-    await update(ref(db, `urls/${id}`), datos);
-  } else {
-    await set(push(ref(db, "urls")), datos);
-  }
-  resetFormUrl();
-});
+      if (!datos.url || !datos.descripcion) {
+        alert("URL y descripción son obligatorios");
+        return;
+      }
 
-document.getElementById("btn-url-cancelar").addEventListener("click", resetFormUrl);
+      if (id) {
+        await update(ref(db, `urls/${id}`), datos);
+      } else {
+        await set(push(ref(db, "urls")), datos);
+      }
+      resetFormUrl();
+    } catch (err) {
+      console.error("Error guardando URL:", err);
+      alert("Error al guardar la URL:\n" + err.message + "\n\nRevisa las reglas de Firebase (deben permitir escritura).");
+    }
+  });
+}
+
+const btnUrlCancelar = document.getElementById("btn-url-cancelar");
+if (btnUrlCancelar) btnUrlCancelar.addEventListener("click", resetFormUrl);
 
 function resetFormUrl() {
-  document.getElementById("form-url").reset();
-  document.getElementById("url-id").value = "";
-  document.getElementById("url-fecha").value = hoy;
-  document.getElementById("btn-url").textContent = "Añadir URL";
-  document.getElementById("btn-url-cancelar").style.display = "none";
+  const form = document.getElementById("form-url");
+  if (form) form.reset();
+  const idEl = document.getElementById("url-id");
+  if (idEl) idEl.value = "";
+  const fechaEl = document.getElementById("url-fecha");
+  if (fechaEl) fechaEl.value = hoy;
+  const btn = document.getElementById("btn-url");
+  if (btn) btn.textContent = "Añadir URL";
+  const btnCancel = document.getElementById("btn-url-cancelar");
+  if (btnCancel) btnCancel.style.display = "none";
 }
 
 window.abrirUrl = function(url) {
@@ -663,8 +773,8 @@ window.editarUrl = function(id) {
   const u = todasLasUrls.find(x => x.id === id);
   if (!u) return;
   document.getElementById("url-id").value = id;
-  document.getElementById("url-fecha").value = u.fecha;
-  document.getElementById("url-link").value = u.url;
+  document.getElementById("url-fecha").value = u.fecha || hoy;
+  document.getElementById("url-link").value = u.url || "";
   document.getElementById("url-desc").value = u.descripcion || "";
   document.getElementById("url-obs").value = u.observaciones || "";
   document.getElementById("btn-url").textContent = "Guardar cambios";
@@ -675,12 +785,19 @@ window.editarUrl = function(id) {
 
 window.borrarUrl = async function(id) {
   if (!confirm("¿Borrar esta URL?")) return;
-  await remove(ref(db, `urls/${id}`));
+  try {
+    await remove(ref(db, `urls/${id}`));
+  } catch (err) {
+    console.error(err);
+    alert("Error al borrar: " + err.message);
+  }
 };
 
 // ===== Utilidades =====
 function formatearFecha(fecha) {
   if (!fecha || fecha === "En curso") return fecha;
-  const [y, m, d] = fecha.split("-");
+  const parts = String(fecha).split("-");
+  if (parts.length !== 3) return fecha;
+  const [y, m, d] = parts;
   return `${d}/${m}/${y}`;
 }
