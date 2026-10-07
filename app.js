@@ -17,6 +17,7 @@ const db = getDatabase(app);
 let todasLasCargas = [];
 let todaLaBitacora = [];
 let todosLosMantenimientos = [];
+let todasLasUrls = [];
 let chartLitros = null;
 let chartGasto = null;
 let chartPrecio = null;
@@ -36,6 +37,7 @@ const hoy = new Date().toISOString().slice(0, 10);
 document.getElementById("carga-fecha").value = hoy;
 document.getElementById("bit-fecha").value = hoy;
 document.getElementById("mant-fecha").value = hoy;
+document.getElementById("url-fecha").value = hoy;
 
 // ===== Cálculo importe =====
 const inputLitros = document.getElementById("carga-litros");
@@ -88,6 +90,16 @@ onValue(ref(db, "mantenimientos"), (snapshot) => {
   actualizarStats();
 });
 
+// ===== Cargar URLs =====
+onValue(ref(db, "urls"), (snapshot) => {
+  const data = snapshot.val() || {};
+  todasLasUrls = Object.entries(data)
+    .map(([id, u]) => ({ id, ...u }))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+  renderUrls();
+});
+
 // ===== Render Bitácora =====
 function renderBitacora() {
   const tbody = document.getElementById("tabla-bitacora");
@@ -133,6 +145,48 @@ function renderMantenimientos() {
   `).join("");
 
   document.getElementById("mant-count").textContent = todosLosMantenimientos.length;
+}
+
+// ===== Render URLs =====
+function renderUrls() {
+  const tbody = document.getElementById("tabla-urls");
+  tbody.innerHTML = todasLasUrls.map(u => {
+    const urlCorta = u.url.length > 40 ? u.url.slice(0, 37) + "..." : u.url;
+    return `
+      <tr>
+        <td>${formatearFecha(u.fecha)}</td>
+        <td style="white-space: normal; max-width: 180px;">${u.descripcion || "—"}</td>
+        <td style="white-space: normal; max-width: 200px;">
+          <a href="${escapeHtml(u.url)}" target="_blank" rel="noopener noreferrer" class="url-link" title="${escapeHtml(u.url)}">${escapeHtml(urlCorta)}</a>
+        </td>
+        <td style="white-space: normal; max-width: 200px;">${u.observaciones || "—"}</td>
+        <td>
+          <button class="btn-icon" onclick="abrirUrl('${escapeAttr(u.url)}')" title="Abrir en nueva ventana">🔗</button>
+          <button class="btn-icon" onclick="editarUrl('${u.id}')">✏️</button>
+          <button class="btn-icon danger" onclick="borrarUrl('${u.id}')">🗑️</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  document.getElementById("url-count").textContent = todasLasUrls.length;
+}
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escapeAttr(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/"/g, "&quot;");
 }
 
 // ===== Filtro año =====
@@ -181,7 +235,6 @@ function actualizarStats() {
   document.getElementById("gasto-mantenimiento").textContent = gastoMantenimiento.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
   document.getElementById("gasto-total").textContent = gastoTotal.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
 
-  // Consumo medio diario (desde la primera carga hasta hoy)
   if (todasLasCargas.length > 0) {
     const fechas = todasLasCargas.map(c => c.fecha).sort();
     const primera = fechas[0];
@@ -565,6 +618,64 @@ window.editarMantenimiento = function(id) {
 window.borrarMantenimiento = async function(id) {
   if (!confirm("¿Borrar este mantenimiento?")) return;
   await remove(ref(db, `mantenimientos/${id}`));
+};
+
+// ===== Formulario URLs =====
+document.getElementById("form-url").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("url-id").value;
+  let urlValue = document.getElementById("url-link").value.trim();
+  if (urlValue && !/^https?:\/\//i.test(urlValue)) {
+    urlValue = "https://" + urlValue;
+  }
+
+  const datos = {
+    fecha: document.getElementById("url-fecha").value,
+    url: urlValue,
+    descripcion: document.getElementById("url-desc").value.trim(),
+    observaciones: document.getElementById("url-obs").value.trim() || null
+  };
+
+  if (id) {
+    await update(ref(db, `urls/${id}`), datos);
+  } else {
+    await set(push(ref(db, "urls")), datos);
+  }
+  resetFormUrl();
+});
+
+document.getElementById("btn-url-cancelar").addEventListener("click", resetFormUrl);
+
+function resetFormUrl() {
+  document.getElementById("form-url").reset();
+  document.getElementById("url-id").value = "";
+  document.getElementById("url-fecha").value = hoy;
+  document.getElementById("btn-url").textContent = "Añadir URL";
+  document.getElementById("btn-url-cancelar").style.display = "none";
+}
+
+window.abrirUrl = function(url) {
+  if (!url) return;
+  window.open(url, "_blank", "noopener,noreferrer");
+};
+
+window.editarUrl = function(id) {
+  const u = todasLasUrls.find(x => x.id === id);
+  if (!u) return;
+  document.getElementById("url-id").value = id;
+  document.getElementById("url-fecha").value = u.fecha;
+  document.getElementById("url-link").value = u.url;
+  document.getElementById("url-desc").value = u.descripcion || "";
+  document.getElementById("url-obs").value = u.observaciones || "";
+  document.getElementById("btn-url").textContent = "Guardar cambios";
+  document.getElementById("btn-url-cancelar").style.display = "inline-flex";
+  document.querySelector('[data-tab="urls"]').click();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+window.borrarUrl = async function(id) {
+  if (!confirm("¿Borrar esta URL?")) return;
+  await remove(ref(db, `urls/${id}`));
 };
 
 // ===== Utilidades =====
